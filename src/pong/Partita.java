@@ -3,11 +3,17 @@ package pong;
 
 import java.util.Random;
 
-/** Una partita: due giocatori, due racchette, una palla, e i conti di chi vince. */
+/** Una partita: due giocatori, due racchette, una palla, i conti di chi vince e i livelli. */
 class Partita {
-    /** Si gioca a 11, con almeno due punti di scarto (11 a 10 non basta, 12 a 10 sì). */
-    static final int PUNTI_PER_VINCERE = 11;
+    /** Si gioca a 5, con almeno due punti di scarto (5 a 4 non basta, 6 a 4 sì). */
+    static final int PUNTI_PER_VINCERE = 5;
     static final int SCARTO_MINIMO = 2;
+
+    /** I livelli: quanti sono, quante vite si hanno, quanto va veloce la palla. */
+    static final int NUMERO_LIVELLI = 5;
+    static final int VITE = 3;
+    static final double VELOCITA_AL_LIVELLO_1 = 5;
+    static final double VELOCITA_IN_PIU_A_OGNI_LIVELLO = 0.5;
 
     private final Campo campo;
     private final Giocatore giocatoreSinistra;
@@ -17,8 +23,16 @@ class Partita {
     private final Palla palla;
     private boolean iniziata;
     private final Punteggio punteggio = new Punteggio(PUNTI_PER_VINCERE, SCARTO_MINIMO);
+    private final Livelli livelli;
 
+    /** Una partita fra due persone: i livelli ci sono, ma non cambiano niente. */
     Partita(Campo campo, Giocatore giocatoreSinistra, Giocatore giocatoreDestra) {
+        this(campo, giocatoreSinistra, giocatoreDestra, new Livelli(NUMERO_LIVELLI, VITE, Lato.SINISTRA));
+    }
+
+    /** Una partita a livelli: la persona gioca dal lato livelli.getUmano(). */
+    Partita(Campo campo, Giocatore giocatoreSinistra, Giocatore giocatoreDestra, Livelli livelli) {
+        this.livelli = livelli;
         this.campo = campo;
         this.giocatoreSinistra = giocatoreSinistra;
         this.giocatoreDestra = giocatoreDestra;
@@ -39,11 +53,25 @@ class Partita {
     /** Vero se si sta giocando: la partita è cominciata e non è finita. */
     boolean isInCorso() { return iniziata && !punteggio.isFinita(); }
 
-    /** Rimette a zero i conti e lancia la palla. */
+    // Quello che lo Schermo può chiedere sui livelli: solo leggere.
+    int getLivello() { return livelli.getLivello(); }
+    int getNumeroLivelli() { return livelli.getNumeroLivelli(); }
+    int getVite() { return livelli.getVite(); }
+    boolean isCompletato() { return livelli.isCompletato(); }
+    boolean isPerso() { return livelli.isPerso(); }
+    Lato getUmano() { return livelli.getUmano(); }
+
+    /** Rimette a zero i conti e lancia la palla; se il gioco era finito, ricomincia dal livello 1. */
     void avvia() {
+        if (livelli.isFinito()) livelli.ricomincia();
         punteggio.azzera();
         iniziata = true;
-        palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, new Random().nextBoolean());
+        palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, new Random().nextBoolean(), velocita());
+    }
+
+    /** La velocità della palla al livello di adesso. */
+    private double velocita() {
+        return VELOCITA_AL_LIVELLO_1 + VELOCITA_IN_PIU_A_OGNI_LIVELLO * (livelli.getLivello() - 1);
     }
 
     /** Un passo del gioco: viene chiamato 60 volte al secondo. */
@@ -85,10 +113,12 @@ class Partita {
         }
     }
 
-    /** Dopo un punto: se la partita non è finita, si serve verso chi ha subito il punto. */
+    /** Dopo un punto: se la partita è finita lo dice ai livelli, altrimenti si serve verso chi ha subito il punto. */
     private void dopoIlPunto(boolean versoSinistra) {
-        if (!punteggio.isFinita()) {
-            palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, !versoSinistra);
+        if (punteggio.isFinita()) {
+            livelli.partitaFinita(punteggio.getVincitore());
+        } else {
+            palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, !versoSinistra, velocita());
         }
     }
 
